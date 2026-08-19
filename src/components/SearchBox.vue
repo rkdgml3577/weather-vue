@@ -1,10 +1,9 @@
 <script setup>
 defineProps({
   modelValue: String,
-  result: String,
 })
 
-const emit = defineEmits(['update:modelValue', 'search'])
+const emit = defineEmits(['update:modelValue'])
 
 const onInput = (e) => {
   emit('update:modelValue', e.target.value)
@@ -20,10 +19,7 @@ const onInput = (e) => {
       @input="onInput"
       placeholder="검색할 도시 이름 입력"
     />
-    <button class="search-btn" @click="emit('search')">검색</button>
-    <p v-if="result" class="search-result">
-      입력한 도시: <strong>{{ result }}</strong>
-    </p>
+    <p class="search-hint">검색 중인 도시: {{ modelValue || '(없음)' }}</p>
   </section>
 </template>
 
@@ -40,24 +36,16 @@ const onInput = (e) => {
   margin-bottom: 8px;
 }
 .search-input {
-  width: 60%;
+  width: 100%;
+  box-sizing: border-box;
   padding: 8px 10px;
   border: 1px solid #dcdde1;
   border-radius: 6px;
   font-size: 14px;
 }
-.search-btn {
-  padding: 8px 14px;
-  margin-left: 6px;
-  border: none;
-  border-radius: 6px;
-  background: #0984e3;
-  color: #fff;
-  cursor: pointer;
-}
-.search-result {
-  margin: 10px 0 0;
-  font-size: 14px;
-  color: #0984e3;
+.search-hint {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #636e72;
 }
 </style>

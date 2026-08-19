@@ -1,16 +1,16 @@
 <script setup>
 defineProps({
-  selectedCity: String,
+  selectedCity: Object,
 })
 </script>
 
 <template>
   <footer class="status-bar">
     <span v-if="selectedCity">
-      ✅ <strong>{{ selectedCity }}</strong
-      >(이)가 선택되었습니다.
+      ✅ <strong>{{ selectedCity.name }}</strong
+      >이(가) 선택되었습니다. (현재 {{ selectedCity.status }}, {{ selectedCity.temp }}℃)
     </span>
-    <span v-else class="status-empty"> 카드를 클릭하거나 검색해 보세요. </span>
+    <span v-else class="status-empty"> 카드를 클릭해 도시를 선택해 보세요. </span>
   </footer>
 </template>
 
