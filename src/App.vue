@@ -1,125 +1,92 @@
 <script setup>
-import { ref, computed, watch, watchEffect } from 'vue'
-import SearchBox from './components/SearchBox.vue'
-import WeatherCard from './components/WeatherCard.vue'
-import StatusBar from './components/StatusBar.vue'
-
-// ── 요구사항 1: 반응형 상태 ──
-const weatherList = ref([
-  { id: 'city_01', name: '서울', temp: 28, status: '맑음' },
-  { id: 'city_02', name: '수원', temp: 24, status: '비' },
-  { id: 'city_03', name: '부산', temp: 26, status: '구름' },
-  { id: 'city_04', name: '대구', temp: 31, status: '맑음' },
-  { id: 'city_05', name: '제주', temp: 22, status: '바람' },
-])
-const searchQuery = ref('')
-const selectedCityInfo = ref(null)
-
-// ── 요구사항 5: 본인 추가 상태 ──
-const clickCount = ref(0)
-
-// ── 요구사항 2: computed (검색어 필터링) ──
-const filteredWeatherList = computed(() => {
-  if (searchQuery.value === '') return weatherList.value
-  return weatherList.value.filter((city) => city.name.includes(searchQuery.value))
-})
-
-// ── 요구사항 5: 본인 추가 computed ──
-const hotCityCount = computed(() => weatherList.value.filter((c) => c.temp >= 30).length)
-
-// ── 요구사항 3: watch (selectedCityInfo 감시) ──
-watch(selectedCityInfo, (newVal, oldVal) => {
-  console.log('[watch] 선택 도시 변경:', oldVal?.name ?? '없음', '→', newVal?.name)
-})
-
-// ── 요구사항 3: watchEffect (searchQuery 추적) ──
-watchEffect(() => {
-  console.log('[watchEffect] 현재 검색어:', searchQuery.value || '(비어있음)')
-})
-
-// ── 요구사항 5: 본인 추가 watch ──
-watch(clickCount, (n) => {
-  console.log('[watch] 카드 클릭 누적:', n, '회')
-})
-
-// 카드 클릭 → 선택
-const onSelect = (name) => {
-  const found = weatherList.value.find((c) => c.name === name)
-  selectedCityInfo.value = found
-  clickCount.value++
-}
-
-// 1번 과제 기능 유지: 상세보기 버튼 → alert
-const onDetail = (city) => {
-  window.alert(`${city.name}의 현재 날씨는 [${city.status}] 상태입니다.`)
-}
+import { RouterLink, RouterView } from 'vue-router'
+import UnitToggler from '@/components/exercise/UnitToggler.vue'
 </script>
 
 <template>
-  <div class="weather-app">
-    <h1 class="app-title">🌤️ 날씨 (Composition)</h1>
+  <div class="app-shell">
+    <header class="app-header">
+      <h1 class="app-title">⛳ 골프 캐디 어시스턴트</h1>
 
-    <SearchBox v-model="searchQuery" />
+      <div class="nav-row">
+        <!-- Navigation Bar -->
+        <nav class="app-nav">
+          <RouterLink to="/">🏠 날씨 대시보드</RouterLink>
+          <span class="divider">|</span>
+          <RouterLink to="/alerts">⛈️ 경보 현황</RouterLink>
+          <span class="divider">|</span>
+          <RouterLink to="/about">ℹ️ 서비스 소개</RouterLink>
+        </nav>
 
-    <section class="card-list">
-      <div class="section-head">
-        <h2 class="section-title">📍 지역별 날씨 현황</h2>
-        <span class="meta">30도↑ {{ hotCityCount }}곳 · 클릭 {{ clickCount }}회</span>
+        <!-- Navigation Bar 옆의 단위 설정 영역 -->
+        <UnitToggler />
       </div>
+    </header>
 
-      <!-- 요구사항 4: 검색 결과 표시 -->
-      <template v-if="filteredWeatherList.length > 0">
-        <WeatherCard
-          v-for="city in filteredWeatherList"
-          :key="city.id"
-          :city="city"
-          @select="onSelect"
-          @detail="onDetail"
-        />
-      </template>
-      <p v-else class="no-result">'{{ searchQuery }}'와(과) 일치하는 도시가 없습니다.</p>
-    </section>
-
-    <StatusBar :selected-city="selectedCityInfo" />
+    <!-- 메인 콘텐츠 영역: 현재 경로에 매칭된 View가 렌더링된다 -->
+    <main class="app-main">
+      <RouterView />
+    </main>
   </div>
 </template>
 
 <style scoped>
-.weather-app {
-  max-width: 480px;
-  margin: 24px auto;
-  padding: 20px;
-  font-family:
-    'Pretendard',
-    -apple-system,
-    sans-serif;
-  color: #2d3436;
+.app-shell {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.app-header {
+  padding: 18px 20px 0;
+  text-align: center;
 }
 .app-title {
-  font-size: 22px;
-  margin-bottom: 20px;
+  margin: 0 0 14px;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
-.section-head {
+.nav-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  padding-bottom: 8px;
-  border-bottom: 2px solid #dfe6e9;
-  margin-bottom: 14px;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--c-border);
+  flex-wrap: wrap;
 }
-.section-title {
-  font-size: 16px;
-  margin: 0;
+.app-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
 }
-.meta {
-  font-size: 12px;
-  color: #95a5a6;
+/* 폭이 좁아 줄바꿈될 때도 단위 영역은 오른쪽에 붙는다 */
+.nav-row > :last-child {
+  margin-left: auto;
 }
-.no-result {
-  padding: 24px;
-  text-align: center;
-  color: #95a5a6;
-  background: #f5f6fa;
-  border-radius: 10px;
+.app-nav a {
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: var(--c-text-sub);
+}
+.app-nav a:hover {
+  background: var(--c-surface-soft);
+  color: var(--c-text);
+}
+/* 현재 경로와 정확히 일치하는 링크에 vue-router가 붙여 주는 클래스 */
+.app-nav a.router-link-exact-active {
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+  font-weight: 700;
+}
+.divider {
+  color: var(--c-border-strong);
+  font-size: 11px;
+}
+.app-main {
+  padding: 18px 20px 22px;
 }
 </style>
