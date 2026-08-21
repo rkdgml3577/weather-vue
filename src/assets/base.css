@@ -1,38 +1,65 @@
-/* ===== 디자인 토큰 =====
- * 색·모서리·그림자를 한 곳에서 관리한다.
- * 각 컴포넌트의 scoped 스타일은 이 변수만 참조한다. */
+/* ===== 디자인 토큰 — "벤토 박스 · 야외 시인성" =====
+ * 골프장 햇빛 아래에서 힐끗 보고 판단하는 앱.
+ *   · 선(border)이 아니라 명도 차이로 구역을 나눈다
+ *   · 핵심 수치는 아주 두껍고 크게
+ *   · 누르는 요소에는 촉각적 반응(스케일 + 그림자)
+ *
+ * 변수 이름은 그대로 두고 값만 교체했다. 이 파일 하나로 전체 톤이 바뀐다.
+ */
 :root {
-  /* 배경 / 면 */
-  --c-page: #eef2f7;
-  --c-surface: #ffffff;
-  --c-surface-soft: #f6f8fb;
+  /* ── 면(surface): 배경 → 블록 → 중첩 타일 순으로 밝아진다 ── */
+  --c-page: #e9edf2; /* 바탕 */
+  --c-paper: #ffffff; /* 벤토 블록 */
+  --c-paper-alt: #f2f5f9; /* 블록 안 중첩 타일 */
 
-  /* 선 */
-  --c-border: #dde4ec;
-  --c-border-strong: #c6d0dc;
+  /* ── 선은 최소한으로. 대부분의 구역은 면으로 나눈다 ── */
+  --c-rule: #e6eaf0;
+  --c-rule-strong: #d3d9e2;
 
-  /* 글자 */
-  --c-text: #1f2a37;
-  --c-text-sub: #6b7785;
+  /* ── 글자: 햇빛 아래 대비를 위해 거의 검정 ── */
+  --c-ink: #0d1216;
+  --c-ink-soft: #59636f;
+  --c-ink-faint: #8d97a3;
 
-  /* 포인트(파랑) */
-  --c-primary: #12c748;
-  --c-primary-dark: #12c748;
-  --c-primary-soft: #e8f0fe;
+  /* ── 짙은 블록: 검정 대신 페어웨이 그늘색 ── */
+  --c-deep: #123a2b;
+  --c-deep-2: #0c2a1f;
+  --c-deep-line: rgba(255, 255, 255, 0.14);
 
-  /* 상태 */
-  --c-good: #0f9d58;
-  --c-good-bg: #e6f4ea;
-  --c-caution: #b06000;
-  --c-caution-bg: #fef3e0;
-  --c-danger: #d93025;
-  --c-danger-bg: #fce8e6;
+  /* ── 포인트: 페어웨이 그린 (채도 높게, 흰 위에서 또렷하게) ── */
+  --c-accent: #00a05a;
+  --c-accent-deep: #007944;
+  --c-accent-soft: #dcf5e8;
 
-  /* 모양 */
-  --radius: 10px;
-  --radius-lg: 14px;
-  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
-  --shadow: 0 2px 8px rgba(16, 24, 40, 0.08);
+  /* ── 상태: 야외에서도 즉시 구분되는 고채도 ── */
+  --c-good: #00a05a;
+  --c-good-bg: #dcf5e8;
+  --c-caution: #d98200;
+  --c-caution-bg: #fdeed4;
+  --c-danger: #e03127;
+  --c-danger-bg: #fde3e1;
+
+  /* ── 모양: 둥근 덩어리 ── */
+  --radius-sm: 12px;
+  --radius: 16px;
+  --radius-lg: 24px;
+  --radius-pill: 999px;
+
+  /* ── 그림자: 떠 있는 느낌은 아주 옅게, 눌림은 또렷하게 ── */
+  --shadow-sm: 0 1px 2px rgba(13, 18, 22, 0.04);
+  --shadow: 0 2px 4px rgba(13, 18, 22, 0.04), 0 12px 28px -18px rgba(13, 18, 22, 0.28);
+  --shadow-lift: 0 4px 10px rgba(13, 18, 22, 0.07), 0 18px 40px -22px rgba(13, 18, 22, 0.38);
+
+  /* ── 촉각적 반응 곡선 ── */
+  --ease: cubic-bezier(0.2, 0.9, 0.25, 1);
+
+  /* ── 활자 ── */
+  --font-body: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'Pretendard Variable', 'Pretendard', -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', monospace;
+  --font-hand: var(--font-body);
+
+  --site-width: 1120px;
 }
 
 *,
@@ -40,24 +67,56 @@
 *::after {
   box-sizing: border-box;
   margin: 0;
-  font-weight: normal;
+  font-weight: inherit;
 }
 
 body {
   min-height: 100vh;
-  color: var(--c-text);
+  color: var(--c-ink);
   background: var(--c-page);
   line-height: 1.6;
-  font-family:
-    'Pretendard',
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-body);
   font-size: 15px;
+  font-weight: 500;
+  /* 한국어는 어절 단위로 줄바꿈해야 읽기 좋다 */
+  word-break: keep-all;
+  overflow-wrap: break-word;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* 접근성: 모션을 줄이도록 설정한 사용자에게는 스케일 반응을 끈다 */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* ===== 공통 활자 유틸 (템플릿에서 이미 쓰이는 클래스라 이름은 유지) ===== */
+
+/* 수치: 자릿수가 흔들리지 않게 고정폭 + 아주 두껍게 */
+.num {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+/* 작은 항목 라벨 */
+.label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-ink-faint);
+}
+
+/* 강조 한 줄 (예전 손글씨 자리 → 굵은 포인트 문장) */
+.hand {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  color: var(--c-ink);
 }

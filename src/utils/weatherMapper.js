@@ -31,6 +31,10 @@ export const mapCurrentWeather = (data) => ({
   humidity: data.main.humidity,
   lightning: estimateLightning(data.weather[0].id),
   observedAt: data.dt * 1000,
+  /* 일출·일몰은 티오프 가능 시간 계산에 쓴다 (추가 API 호출 불필요) */
+  sunrise: data.sys?.sunrise ? data.sys.sunrise * 1000 : null,
+  sunset: data.sys?.sunset ? data.sys.sunset * 1000 : null,
+  timezone: data.timezone ?? 32400,
 })
 
 /* 대기 오염 응답 → 미세먼지 요약 */

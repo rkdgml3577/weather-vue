@@ -1,4 +1,5 @@
 <script setup>
+import AppIcon from '@/components/icons/AppIcon.vue'
 import { useRoute, RouterLink } from 'vue-router'
 
 /* Catch-all Route로 들어온 잘못된 경로를 보여준다 */
@@ -7,7 +8,7 @@ const route = useRoute()
 
 <template>
   <div class="not-found">
-    <p class="emoji">⛳ ❓</p>
+    <p class="emoji"><AppIcon name="flag" :size="46" /><AppIcon name="help" :size="46" /></p>
     <h2 class="title">페이지를 찾을 수 없습니다.</h2>
     <p class="desc">
       요청하신 주소 <code>{{ route.fullPath }}</code> 는 존재하지 않거나,<br />
@@ -19,44 +20,60 @@ const route = useRoute()
 
 <style scoped>
 .not-found {
-  padding: 52px 20px;
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius);
-  background: var(--c-surface);
+  padding: 80px 24px;
+  border-radius: var(--radius-lg);
+  background: var(--c-paper);
+  box-shadow: var(--shadow);
   text-align: center;
 }
 .emoji {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
   margin: 0;
-  font-size: 46px;
-  letter-spacing: 8px;
+  color: var(--c-ink-faint);
+}
+.emoji :deep(svg) {
+  stroke-width: 1.5;
 }
 .title {
-  margin: 18px 0 8px;
-  font-size: 19px;
-  font-weight: 700;
+  margin: 24px 0 10px;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
 }
 .desc {
-  margin: 0 0 22px;
-  font-size: 12px;
+  margin: 0 0 28px;
+  font-size: 14px;
+  font-weight: 600;
   line-height: 1.8;
-  color: var(--c-text-sub);
+  color: var(--c-ink-faint);
 }
 code {
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: var(--c-surface-soft);
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: var(--c-paper-alt);
   color: var(--c-danger);
+  font-weight: 700;
 }
 .home-btn {
   display: inline-block;
-  padding: 10px 22px;
-  border-radius: 8px;
-  background: var(--c-primary);
+  padding: 15px 28px;
+  border-radius: var(--radius-pill);
+  background: var(--c-accent);
   color: #fff;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 800;
+  box-shadow: 0 10px 24px -12px var(--c-accent);
+  transition: transform 0.18s var(--ease);
 }
 .home-btn:hover {
-  background: var(--c-primary-dark);
+  background: #00b366;
+  color: #fff;
+  transform: translateY(-2px);
+}
+.home-btn:active {
+  transform: scale(0.96);
 }
 </style>

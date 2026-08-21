@@ -1,21 +1,26 @@
 <script setup>
 import { RouterLink, RouterView } from 'vue-router'
 import UnitToggler from '@/components/exercise/UnitToggler.vue'
+import SiteFooter from '@/components/exercise/SiteFooter.vue'
 </script>
 
 <template>
   <div class="app-shell">
+    <!-- 노트 표지 — 스크롤해도 따라온다 -->
     <header class="app-header">
-      <h1 class="app-title">⛳ 골프 캐디 어시스턴트</h1>
+      <div class="header-inner">
+        <RouterLink class="brand" to="/">
+          <span class="brand-name">골프 캐디 어시스턴트</span>
+          <span class="brand-sub">CADDIE NOTES · WIND &amp; PLAY</span>
+        </RouterLink>
 
-      <div class="nav-row">
         <!-- Navigation Bar -->
         <nav class="app-nav">
-          <RouterLink to="/">🏠 날씨 대시보드</RouterLink>
-          <span class="divider">|</span>
-          <RouterLink to="/alerts">⛈️ 경보 현황</RouterLink>
-          <span class="divider">|</span>
-          <RouterLink to="/about">ℹ️ 서비스 소개</RouterLink>
+          <RouterLink to="/">대시보드</RouterLink>
+          <RouterLink to="/courses">골프장</RouterLink>
+          <RouterLink to="/club">클럽 계산</RouterLink>
+          <RouterLink to="/alerts">경보</RouterLink>
+          <RouterLink to="/about">소개</RouterLink>
         </nav>
 
         <!-- Navigation Bar 옆의 단위 설정 영역 -->
@@ -27,66 +32,127 @@ import UnitToggler from '@/components/exercise/UnitToggler.vue'
     <main class="app-main">
       <RouterView />
     </main>
+
+    <SiteFooter />
   </div>
 </template>
 
 <style scoped>
+/* ===== 벤토 셸 ===== */
 .app-shell {
-  background: var(--c-surface);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
+
+/* ===== 헤더 : 선 없이 반투명 면으로만 떠 있는다 ===== */
 .app-header {
-  padding: 18px 20px 0;
-  text-align: center;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: color-mix(in srgb, var(--c-page) 82%, transparent);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
 }
-.app-title {
-  margin: 0 0 14px;
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-.nav-row {
+.header-inner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--c-border);
+  gap: 16px;
   flex-wrap: wrap;
+  max-width: var(--site-width);
+  margin: 0 auto;
+  padding: 16px 24px;
 }
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  color: var(--c-ink);
+}
+.brand-name {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+}
+.brand-sub {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--c-ink-faint);
+  white-space: nowrap;
+}
+
+/* ===== 내비 : 흰 알약 덩어리 하나 ===== */
 .app-nav {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  margin-right: auto;
+  flex-wrap: wrap;
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--c-paper);
+  box-shadow: var(--shadow-sm);
   font-size: 13px;
-}
-/* 폭이 좁아 줄바꿈될 때도 단위 영역은 오른쪽에 붙는다 */
-.nav-row > :last-child {
-  margin-left: auto;
+  font-weight: 700;
 }
 .app-nav a {
-  padding: 6px 12px;
-  border-radius: 999px;
-  color: var(--c-text-sub);
+  padding: 8px 15px;
+  border-radius: var(--radius-pill);
+  color: var(--c-ink-soft);
+  transition:
+    transform 0.18s var(--ease),
+    background 0.18s var(--ease),
+    color 0.18s var(--ease);
 }
 .app-nav a:hover {
-  background: var(--c-surface-soft);
-  color: var(--c-text);
+  background: var(--c-paper-alt);
+  color: var(--c-ink);
+}
+.app-nav a:active {
+  transform: scale(0.94);
 }
 /* 현재 경로와 정확히 일치하는 링크에 vue-router가 붙여 주는 클래스 */
 .app-nav a.router-link-exact-active {
-  background: var(--c-primary-soft);
-  color: var(--c-primary);
-  font-weight: 700;
+  background: var(--c-deep);
+  color: var(--c-paper);
+  box-shadow: var(--shadow-sm);
 }
-.divider {
-  color: var(--c-border-strong);
-  font-size: 11px;
-}
+
+/* ===== 본문 ===== */
 .app-main {
-  padding: 18px 20px 22px;
+  flex: 1;
+  width: 100%;
+  max-width: var(--site-width);
+  margin: 0 auto;
+  padding: 8px 24px 12px;
+}
+
+@media (max-width: 760px) {
+  .header-inner {
+    padding: 12px 16px;
+    gap: 10px;
+  }
+  .brand {
+    flex: 1;
+  }
+  .brand-name {
+    font-size: 16px;
+  }
+  .app-nav {
+    order: 3;
+    flex: 0 0 100%;
+    justify-content: space-between;
+    font-size: 12px;
+  }
+  .app-nav a {
+    padding: 8px 11px;
+  }
+  .app-main {
+    padding: 4px 16px 12px;
+  }
 }
 </style>

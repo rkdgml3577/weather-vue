@@ -1,4 +1,5 @@
 <script setup>
+import AppIcon from '@/components/icons/AppIcon.vue'
 import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import BaseDashboardCard from '@/components/exercise/BaseDashboardCard.vue'
@@ -30,17 +31,19 @@ const dangerCount = computed(() => alertList.value.filter((c) => c.play.level ==
 
 <template>
   <div class="alert-view">
-    <BaseDashboardCard icon="⛈️" title="낙뢰 · 기상 경보 현황">
-      <template #meta>🔴 위험 {{ dangerCount }}곳 / 전체 {{ alertList.length }}곳</template>
+    <BaseDashboardCard icon="rain" title="낙뢰 · 기상 경보 현황">
+      <template #meta>위험 {{ dangerCount }}곳 / 전체 {{ alertList.length }}곳</template>
 
       <button
         class="refresh-btn"
         :disabled="weatherStore.isLoading"
         @click="weatherStore.fetchLiveWeather()"
       >
-        {{ weatherStore.isLoading ? '⏳ 불러오는 중...' : '🌐 실시간 날씨 다시 불러오기' }}
+        {{ weatherStore.isLoading ? '불러오는 중...' : '실시간 날씨 다시 불러오기' }}
       </button>
-      <p v-if="weatherStore.error" class="error-msg">⚠️ {{ weatherStore.error }}</p>
+      <p v-if="weatherStore.error" class="error-msg">
+        <AppIcon name="alert" :size="14" /> {{ weatherStore.error }}
+      </p>
 
       <ul v-if="alertList.length > 0" class="alert-list">
         <li
@@ -50,15 +53,16 @@ const dangerCount = computed(() => alertList.value.filter((c) => c.play.level ==
           :class="course.play.className"
         >
           <RouterLink class="alert-link" :to="`/weather/${course.id}`">
-            <span class="alert-name">{{ course.play.icon }} {{ course.name }}</span>
+            <span class="alert-name">{{ course.name }}</span>
             <span class="alert-detail">
-              ⚡{{ course.lightning }}% · 🌬️{{ course.windSpeed }}m/s · 💧{{ course.humidity }}%
+              LTNG {{ course.lightning }}% · WIND {{ course.windSpeed }}m/s · HUM
+              {{ course.humidity }}%
             </span>
           </RouterLink>
           <p class="alert-msg">{{ course.play.message }}</p>
         </li>
       </ul>
-      <p v-else class="no-alert">🟢 현재 경보가 발효된 지역이 없습니다. 좋은 라운딩 되세요!</p>
+      <p v-else class="no-alert">현재 경보가 발효된 지역이 없습니다. 좋은 라운딩 되세요.</p>
 
       <template #footer>
         <RouterLink class="link-btn" to="/">대시보드 홈으로 이동</RouterLink>
@@ -70,98 +74,117 @@ const dangerCount = computed(() => alertList.value.filter((c) => c.play.level ==
 <style scoped>
 .refresh-btn {
   width: 100%;
-  padding: 9px;
-  margin-bottom: 12px;
-  border: 1px dashed var(--c-border-strong);
-  border-radius: 8px;
-  background: var(--c-surface);
-  color: var(--c-text-sub);
-  font-size: 13px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--c-paper-alt);
+  color: var(--c-ink);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 800;
   cursor: pointer;
-  transition: 0.15s;
+  transition:
+    transform 0.18s var(--ease),
+    background 0.18s var(--ease);
+}
+.refresh-btn:hover:not(:disabled) {
+  background: var(--c-rule);
+}
+.refresh-btn:active:not(:disabled) {
+  transform: scale(0.98);
 }
 .refresh-btn:disabled {
-  opacity: 0.55;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 .error-msg {
-  padding: 10px 12px;
-  margin-bottom: 12px;
-  border: 1px solid var(--c-danger);
-  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border-radius: var(--radius);
   background: var(--c-danger-bg);
   color: var(--c-danger);
-  font-size: 12px;
-}
-.refresh-btn:hover:not(:disabled) {
-  border-color: var(--c-primary);
-  background: var(--c-primary-soft);
-  color: var(--c-primary);
+  font-size: 13px;
+  font-weight: 700;
 }
 .alert-list {
+  display: grid;
+  gap: 8px;
   list-style: none;
   margin: 0;
   padding: 0;
 }
 .alert-row {
-  padding: 10px 12px;
-  margin-bottom: 8px;
+  padding: 18px 20px;
   border-radius: var(--radius);
-  border: 1px solid transparent;
+  transition: transform 0.18s var(--ease);
 }
-.alert-row:last-child {
-  margin-bottom: 0;
+.alert-row:hover {
+  transform: translateY(-2px);
 }
 .play-caution {
   background: var(--c-caution-bg);
-  border-color: #f3dfbb;
 }
 .play-danger {
   background: var(--c-danger-bg);
-  border-color: #f5c6c2;
 }
 .alert-link {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
   color: inherit;
 }
-.alert-link:hover .alert-name {
-  text-decoration: underline;
-}
 .alert-name {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--c-ink);
+}
+.alert-link:hover .alert-name {
+  color: var(--c-accent-deep);
 }
 .alert-detail {
-  font-size: 11px;
-  color: var(--c-text-sub);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--c-ink-soft);
+  text-align: right;
 }
 .alert-msg {
-  margin: 4px 0 0;
-  font-size: 12px;
+  margin: 6px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-ink-soft);
 }
 .no-alert {
-  padding: 28px 20px;
+  padding: 48px 24px;
   border-radius: var(--radius);
   background: var(--c-good-bg);
-  color: var(--c-good);
+  color: var(--c-accent-deep);
   text-align: center;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 800;
 }
 .link-btn {
   display: block;
-  padding: 10px;
-  border-radius: 8px;
-  background: var(--c-primary);
+  padding: 16px;
+  border-radius: var(--radius);
+  background: var(--c-deep);
   color: #fff;
   text-align: center;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 800;
+  transition: transform 0.18s var(--ease);
 }
 .link-btn:hover {
-  background: var(--c-primary-dark);
+  background: var(--c-deep-2);
+  color: #fff;
+}
+.link-btn:active {
+  transform: scale(0.98);
 }
 </style>

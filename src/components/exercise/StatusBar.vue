@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import AppIcon from '@/components/icons/AppIcon.vue'
 import { useDisplayTemp } from '@/composables/useDisplayTemp'
 
 const props = defineProps({
@@ -15,43 +16,75 @@ const { displayTemp, unitSymbol } = useDisplayTemp(() => props.selectedCourse?.t
 </script>
 
 <template>
-  <footer class="status-bar" :class="{ stormy: isStormy, empty: !selectedCourse }">
-    <span v-if="selectedCourse">
-      ✅ <strong>{{ selectedCourse.name }}</strong
-      >이(가) 선택되었습니다. ({{ selectedCourse.status }}, {{ displayTemp }}{{ unitSymbol }} · 습도
-      {{ selectedCourse.humidity }}% · 풍속 {{ selectedCourse.windSpeed }}m/s · 낙뢰
-      {{ selectedCourse.lightning }}%)
-      <br />
-      <small>현재 홀 방향: {{ holeText }}쪽</small>
-      <strong v-if="isStormy" class="evacuate"><br />⛈️ 카트로 대피하세요!</strong>
-    </span>
-    <span v-else class="status-empty"> 카드를 클릭하거나 검색해 보세요. </span>
-  </footer>
+  <aside class="memo" :class="{ stormy: isStormy, empty: !selectedCourse }">
+    <span class="label">SELECTED</span>
+
+    <template v-if="selectedCourse">
+      <p class="memo-name">{{ selectedCourse.name }}</p>
+      <p class="memo-line num">
+        {{ selectedCourse.status }} · {{ displayTemp }}{{ unitSymbol }} ·
+        {{ selectedCourse.humidity }}% · {{ selectedCourse.windSpeed }}m/s
+      </p>
+      <p class="memo-line">홀 방향 {{ holeText }}쪽</p>
+      <p v-if="isStormy" class="memo-alert">
+        <AppIcon name="alert" :size="14" /> 카트로 대피하세요
+      </p>
+    </template>
+
+    <p v-else class="memo-empty">카드를 클릭하거나 검색해 보세요.</p>
+  </aside>
 </template>
 
 <style scoped>
-.status-bar {
-  padding: 12px 14px;
-  border-radius: var(--radius);
-  background: var(--c-primary-soft);
-  text-align: center;
+/* ===== 선택 요약 : 짙은 대비 타일 ===== */
+.memo {
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(145deg, var(--c-deep) 0%, var(--c-deep-2) 100%);
+  color: #fff;
+  box-shadow: var(--shadow);
+}
+.memo :deep(.label) {
+  color: rgba(255, 255, 255, 0.5);
+}
+.memo.empty {
+  background: var(--c-paper);
+  color: var(--c-ink);
+}
+.memo.empty :deep(.label) {
+  color: var(--c-ink-faint);
+}
+.memo.stormy {
+  background: var(--c-danger);
+}
+.memo-name {
+  margin: 8px 0 4px;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+.memo-line {
+  margin: 0;
   font-size: 13px;
-  line-height: 1.7;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
 }
-.status-bar.empty {
-  background: var(--c-good-bg);
+.memo-alert {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
 }
-.status-bar.stormy {
-  background: var(--c-danger-bg);
-}
-.evacuate {
-  color: var(--c-danger);
-}
-.status-empty {
-  color: var(--c-good);
-}
-small {
-  color: var(--c-text-sub);
-  font-size: 11px;
+.memo-empty {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-ink-faint);
 }
 </style>

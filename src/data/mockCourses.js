@@ -40,3 +40,45 @@ export const randomizeWeather = (courses) =>
     humidity: rand(35, 95),
     lightning: rand(0, 100) < 30 ? rand(50, 90) : rand(0, 30),
   }))
+
+/* ===== 모의 예보 · 대기질 =====
+ * 상세 화면도 "모의 데이터" 모드를 그대로 따르도록,
+ * 통신 없이 3시간 단위 예보와 대기질을 만들어 준다.
+ * 형태는 utils/weatherMapper 의 mapForecast · mapAirPollution 결과와 동일하다. */
+const STATUS_POOL = ['맑음', '구름', '흐림', '비']
+
+export const createMockForecast = (course, count = 6) => {
+  const base = Date.now()
+  return Array.from({ length: count }, (_, i) => {
+    const at = base + (i + 1) * 3 * 60 * 60 * 1000
+    const date = new Date(at)
+    const status = STATUS_POOL[rand(0, STATUS_POOL.length - 1)]
+    const pop = status === '비' ? rand(50, 90) : rand(0, 30)
+
+    return {
+      at,
+      timeText: `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}시`,
+      /* 현재 기온을 기준으로 ±3℃ 안에서 흔들리게 */
+      temp: (course?.temp ?? 20) + rand(-3, 3),
+      status,
+      description: `${status} (모의)`,
+      windSpeed: rand(0, 12),
+      windDeg: rand(0, 7) * 45,
+      humidity: rand(40, 95),
+      pop,
+      lightning: pop >= 70 ? rand(50, 80) : rand(0, 20),
+    }
+  })
+}
+
+const AQI_TEXT = { 1: '좋음', 2: '양호', 3: '보통', 4: '나쁨', 5: '매우 나쁨' }
+
+export const createMockAir = () => {
+  const aqi = rand(1, 4)
+  return {
+    aqi,
+    aqiText: AQI_TEXT[aqi],
+    pm10: aqi * rand(12, 22),
+    pm25: aqi * rand(7, 14),
+  }
+}

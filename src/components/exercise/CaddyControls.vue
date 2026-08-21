@@ -7,10 +7,10 @@ defineProps({
 defineEmits(['update:holeDeg', 'update:playerLevel'])
 
 const HOLE_DIRECTIONS = [
-  { deg: 0, label: '북 ↑' },
-  { deg: 90, label: '동 →' },
-  { deg: 180, label: '남 ↓' },
-  { deg: 270, label: '서 ←' },
+  { deg: 0, label: 'N', ko: '북' },
+  { deg: 90, label: 'E', ko: '동' },
+  { deg: 180, label: 'S', ko: '남' },
+  { deg: 270, label: 'W', ko: '서' },
 ]
 
 const PLAYER_LEVELS = [
@@ -21,72 +21,116 @@ const PLAYER_LEVELS = [
 </script>
 
 <template>
-  <div class="caddy-picker">
-    <span class="picker-label">⛳ 홀 방향:</span>
-    <button
-      v-for="dir in HOLE_DIRECTIONS"
-      :key="dir.deg"
-      :class="{ active: holeDeg === dir.deg }"
-      @click="$emit('update:holeDeg', dir.deg)"
-    >
-      {{ dir.label }}
-    </button>
+  <div class="picker">
+    <span class="label">HOLE</span>
+    <div class="options">
+      <button
+        v-for="dir in HOLE_DIRECTIONS"
+        :key="dir.deg"
+        :class="{ active: holeDeg === dir.deg }"
+        @click="$emit('update:holeDeg', dir.deg)"
+      >
+        <span class="mark">{{ dir.label }}</span
+        >{{ dir.ko }}
+      </button>
+    </div>
   </div>
 
-  <div class="caddy-picker">
-    <span class="picker-label">🏌️ 플레이어:</span>
-    <button
-      v-for="lv in PLAYER_LEVELS"
-      :key="lv.value"
-      :class="{ active: playerLevel === lv.value }"
-      @click="$emit('update:playerLevel', lv.value)"
-    >
-      {{ lv.label }}
-    </button>
-    <span class="picker-hint">실력이 낮을수록 탄도가 높아 바람 영향을 크게 받습니다.</span>
+  <div class="picker">
+    <span class="label">PLAYER</span>
+    <div class="options">
+      <button
+        v-for="lv in PLAYER_LEVELS"
+        :key="lv.value"
+        :class="{ active: playerLevel === lv.value }"
+        @click="$emit('update:playerLevel', lv.value)"
+      >
+        {{ lv.label }}
+      </button>
+    </div>
   </div>
+
+  <p class="picker-hint">실력이 낮을수록 탄도가 높아 바람 영향을 크게 받습니다.</p>
 </template>
 
 <style scoped>
-.caddy-picker {
+/* ===== 세그먼트 컨트롤 : 누르는 맛 ===== */
+.picker {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 14px;
   margin-bottom: 10px;
-  flex-wrap: wrap;
 }
-.caddy-picker:last-child {
-  margin-bottom: 0;
+.picker .label {
+  width: 54px;
+  flex-shrink: 0;
 }
-.picker-label {
-  font-size: 13px;
+.options {
+  display: flex;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  max-width: 460px;
+  padding: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--c-paper-alt);
+}
+.options button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  padding: 9px 10px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--c-ink-soft);
+  font-family: inherit;
+  font-size: 14px;
   font-weight: 700;
-  margin-right: 2px;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition:
+    transform 0.18s var(--ease),
+    background 0.18s var(--ease),
+    color 0.18s var(--ease),
+    box-shadow 0.18s var(--ease);
+}
+.options button:hover {
+  color: var(--c-ink);
+}
+.options button:active {
+  transform: scale(0.93);
+}
+.options button.active {
+  background: var(--c-paper);
+  color: var(--c-ink);
+  font-weight: 800;
+  box-shadow: var(--shadow);
+}
+.mark {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--c-accent);
 }
 .picker-hint {
-  width: 100%;
-  margin-top: 2px;
-  font-size: 11px;
-  color: var(--c-text-sub);
+  margin: 10px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-ink-faint);
 }
-.caddy-picker button {
-  padding: 6px 14px;
-  border: 1px solid var(--c-border-strong);
-  border-radius: 999px;
-  background: var(--c-surface);
-  color: var(--c-text-sub);
-  font-size: 13px;
-  cursor: pointer;
-  transition: 0.15s;
-}
-.caddy-picker button:hover {
-  border-color: var(--c-primary);
-  color: var(--c-primary);
-}
-.caddy-picker button.active {
-  background: var(--c-primary);
-  border-color: var(--c-primary);
-  color: #fff;
-  font-weight: 700;
+
+@media (max-width: 520px) {
+  .picker {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 7px;
+  }
+  .picker .label {
+    width: auto;
+  }
 }
 </style>

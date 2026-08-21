@@ -6,39 +6,41 @@ const configStore = useConfigStore()
 </script>
 
 <template>
-  <div class="unit-toggler">
-    <span class="unit-label">
-      날씨 단위: {{ configStore.unitLabel }}({{ configStore.unitSymbol }})
-    </span>
-    <button class="unit-btn" @click="configStore.toggleUnit()">단위 변경</button>
-  </div>
+  <button class="unit-toggler" @click="configStore.toggleUnit()">
+    <span class="opt" :class="{ on: !configStore.isFahrenheit }">°C</span>
+    <span class="opt" :class="{ on: configStore.isFahrenheit }">°F</span>
+  </button>
 </template>
 
 <style scoped>
+/* ===== 단위 토글 : 작은 세그먼트 ===== */
 .unit-toggler {
   display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.unit-label {
-  font-size: 11px;
-  color: var(--c-text-sub);
-  white-space: nowrap;
-}
-.unit-btn {
-  padding: 5px 10px;
-  border: 1px solid var(--c-primary);
-  border-radius: 999px;
-  background: var(--c-primary);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
+  gap: 3px;
+  padding: 4px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--c-paper);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
-  white-space: nowrap;
-  transition: 0.15s;
+  transition: transform 0.18s var(--ease);
 }
-.unit-btn:hover {
-  background: var(--c-primary-dark);
-  border-color: var(--c-primary-dark);
+.unit-toggler:active {
+  transform: scale(0.93);
+}
+.opt {
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--c-ink-faint);
+  transition:
+    background 0.18s var(--ease),
+    color 0.18s var(--ease);
+}
+.opt.on {
+  background: var(--c-accent);
+  color: #fff;
 }
 </style>

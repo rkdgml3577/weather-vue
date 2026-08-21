@@ -1,14 +1,17 @@
 <script setup>
 import { ref, computed, watch, watchEffect, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, RouterLink } from 'vue-router'
 import BaseDashboardCard from '@/components/exercise/BaseDashboardCard.vue'
 import SearchBar from '@/components/exercise/SearchBar.vue'
 import WeatherCard from '@/components/exercise/WeatherCard.vue'
 import CaddyControls from '@/components/exercise/CaddyControls.vue'
 import StatusBar from '@/components/exercise/StatusBar.vue'
+import AppIcon from '@/components/icons/AppIcon.vue'
 import { useWeatherStore } from '@/stores/weatherStore'
 import { useCaddyStore } from '@/stores/caddyStore'
 import { judgePlay, degToText } from '@/utils/caddy'
+import { getImpactGuide } from '@/utils/impact'
+import { toast } from '@/composables/useToast'
 
 /* Programmatic Navigation 용 라우터 인스턴스 */
 const router = useRouter()
@@ -28,10 +31,19 @@ const filteredCourseList = computed(() => {
   const base =
     searchQuery.value === ''
       ? weatherStore.courses
-      : weatherStore.courses.filter((c) => c.name.includes(searchQuery.value))
+      : weatherStore.courses.filter((c) =>
+          `${c.name}${c.region}${c.city}`.includes(searchQuery.value.trim()),
+        )
   return base.map((course) => ({
     ...course,
     play: judgePlay(course, caddyStore.holeDeg, caddyStore.windSensitivity),
+    /* 카드에는 추천 샷 이름만 한 줄로 보여 준다 (상세 페이지에 전체 그림) */
+    impact: getImpactGuide(
+      course,
+      caddyStore.holeDeg,
+      caddyStore.playerLevel,
+      caddyStore.windSensitivity,
+    ),
   }))
 })
 
@@ -49,7 +61,7 @@ watch(
   lightningCount,
   (n, prev) => {
     if (n > 0) {
-      evacuateMsg.value = `⛈️ 낙뢰 위험 지역 ${n}곳! 즉시 카트로 대피하세요!`
+      evacuateMsg.value = `낙뢰 위험 지역 ${n}곳! 즉시 카트로 대피하세요!`
       console.log(`[watch] 낙뢰 경보: ${prev ?? 0}곳 → ${n}곳`)
     } else {
       evacuateMsg.value = ''
@@ -114,174 +126,375 @@ const onSelectCard = (course) => {
 const onClickDetail = (course) => {
   router.push(`/weather/${course.id}`)
 }
+
+/* ===== 자식(WeatherCard)이 올려보낸 remove-card 처리 ===== */
+const onRemoveCard = async (course) => {
+  const ok = await toast.confirm(
+    `${course.name}을(를) 대시보드에서 빼시겠습니까?`,
+    '대시보드에서 빼기',
+  )
+  if (!ok) return
+
+  weatherStore.removeCourse(course.id)
+  if (selectedCourseInfo.value?.id === course.id) selectedCourseInfo.value = null
+  toast.info(`${course.name}을(를) 대시보드에서 뺐습니다.`)
+}
 </script>
 
 <template>
   <div class="home-view">
+    <!-- 노트 속표지 -->
+    <section class="cover">
+      <p class="cover-stamp label">WIND · HUMIDITY · LIGHTNING</p>
+      <h2 class="cover-title">오늘, 어떻게 쳐야 할까</h2>
+      <p class="cover-desc">
+        전국 골프장의 실시간 기상을 받아 라운딩 가부와 클럽 선택은 물론,
+        <strong>공의 어느 지점을 때려야 하는지</strong>까지 실력에 맞춰 적어 드립니다.
+      </p>
+      <div class="cover-cta">
+        <RouterLink class="cta primary" to="/courses">
+          <AppIcon name="search" :size="14" /> 골프장 찾기
+        </RouterLink>
+        <RouterLink class="cta" to="/club">
+          <AppIcon name="calculator" :size="14" /> 클럽 계산기
+        </RouterLink>
+      </div>
+    </section>
+
     <!-- watch가 감지한 낙뢰 대피 경보 -->
-    <p v-if="evacuateMsg" class="evacuate-banner">{{ evacuateMsg }}</p>
+    <p v-if="evacuateMsg" class="evacuate-banner">
+      <AppIcon name="alert" :size="16" /> {{ evacuateMsg }}
+    </p>
 
-    <!-- 공통 박스에 SearchBar를 슬롯으로 주입 -->
-    <BaseDashboardCard icon="🔍" title="지역 검색 (한글 즉시 동기화)">
-      <SearchBar :query="searchQuery" @update-query="onUpdateQuery" />
-    </BaseDashboardCard>
+    <div class="dashboard-grid">
+      <!-- 좌측: 검색 · 조건 (데스크톱에서는 스크롤을 따라온다) -->
+      <aside class="side-column">
+        <!-- 공통 박스에 SearchBar를 슬롯으로 주입 -->
+        <BaseDashboardCard icon="search" title="골프장 검색" index="No.01">
+          <SearchBar :query="searchQuery" @update-query="onUpdateQuery" />
+        </BaseDashboardCard>
 
-    <!-- 공통 박스에 CaddyControls를 슬롯으로 주입 -->
-    <BaseDashboardCard icon="🏌️" title="라운딩 조건 설정">
-      <!-- 자식이 올려보낸 이벤트를 스토어 action으로 처리 -->
-      <CaddyControls
-        :hole-deg="caddyStore.holeDeg"
-        :player-level="caddyStore.playerLevel"
-        @update:hole-deg="caddyStore.setHoleDeg"
-        @update:player-level="caddyStore.setPlayerLevel"
-      />
-    </BaseDashboardCard>
+        <!-- 공통 박스에 CaddyControls를 슬롯으로 주입 -->
+        <BaseDashboardCard icon="club" title="라운딩 조건" index="No.02">
+          <!-- 자식이 올려보낸 이벤트를 스토어 action으로 처리 -->
+          <CaddyControls
+            :hole-deg="caddyStore.holeDeg"
+            :player-level="caddyStore.playerLevel"
+            @update:hole-deg="caddyStore.setHoleDeg"
+            @update:player-level="caddyStore.setPlayerLevel"
+          />
+        </BaseDashboardCard>
 
-    <!-- 공통 박스에 WeatherCard 목록을 슬롯으로 주입 -->
-    <BaseDashboardCard icon="📍" title="지역별 코스 컨디션">
-      <template #meta>
-        🌬️ 맞바람 {{ headwindCount }}곳 · 🔴 위험 {{ dangerCount }}곳 · 클릭 {{ clickCount }}회
-      </template>
-
-      <!-- 데이터 출처 표시 + 갱신 버튼 -->
-      <div class="source-bar">
-        <span class="source-badge" :class="weatherStore.isLive ? 'live' : 'mock'">
-          {{ weatherStore.isLive ? '🌐 실시간 관측' : '🧪 모의 데이터' }}
-        </span>
-        <span v-if="weatherStore.lastUpdatedText" class="updated">
-          {{ weatherStore.lastUpdatedText }} 기준
-        </span>
-      </div>
-
-      <div class="btn-row">
-        <button
-          class="fetch-btn"
-          :disabled="weatherStore.isLoading"
-          @click="weatherStore.fetchLiveWeather()"
-        >
-          {{ weatherStore.isLoading ? '⏳ 불러오는 중...' : '🌐 실시간 날씨 불러오기' }}
-        </button>
-        <button
-          class="refresh-btn"
-          :disabled="weatherStore.isLoading"
-          @click="weatherStore.refreshMockWeather()"
-        >
-          🎲 모의 갱신
-        </button>
-      </div>
-
-      <p v-if="weatherStore.error" class="error-msg">⚠️ {{ weatherStore.error }}</p>
-
-      <template v-if="filteredCourseList.length > 0">
-        <WeatherCard
-          v-for="course in filteredCourseList"
-          :key="course.id"
-          :course="course"
-          @select-card="onSelectCard"
-          @click-detail="onClickDetail"
-        />
-      </template>
-      <p v-else class="no-result">'{{ searchQuery }}'와(과) 일치하는 지역이 없습니다.</p>
-
-      <template #footer>
         <StatusBar :selected-course="selectedCourseInfo" :hole-text="caddyStore.holeText" />
-      </template>
-    </BaseDashboardCard>
+      </aside>
+
+      <!-- 우측: 코스 목록 -->
+      <BaseDashboardCard class="main-column" icon="pin" title="코스 컨디션" index="No.03">
+        <template #meta>
+          {{ weatherStore.courseCount }}/{{ weatherStore.maxCourses }}곳 · HEADWIND
+          {{ headwindCount }} · RISK {{ dangerCount }}
+        </template>
+
+        <!-- 데이터 출처 표시 + 갱신 버튼 -->
+        <div class="source-bar">
+          <span class="source-badge" :class="weatherStore.isLive ? 'live' : 'mock'">
+            {{ weatherStore.isLive ? 'LIVE 실시간 관측' : 'MOCK 모의 데이터' }}
+          </span>
+          <span v-if="weatherStore.lastUpdatedText" class="updated">
+            {{ weatherStore.lastUpdatedText }} 기준
+          </span>
+        </div>
+
+        <div class="btn-row">
+          <button
+            class="fetch-btn"
+            :disabled="weatherStore.isLoading"
+            @click="weatherStore.fetchLiveWeather()"
+          >
+            {{ weatherStore.isLoading ? '불러오는 중...' : '실시간 날씨 불러오기' }}
+          </button>
+          <button
+            class="refresh-btn"
+            :disabled="weatherStore.isLoading"
+            @click="weatherStore.refreshMockWeather()"
+          >
+            모의 갱신
+          </button>
+        </div>
+
+        <p v-if="weatherStore.error" class="error-msg">
+          <AppIcon name="alert" :size="14" /> {{ weatherStore.error }}
+        </p>
+
+        <div v-if="filteredCourseList.length > 0" class="card-grid">
+          <WeatherCard
+            v-for="course in filteredCourseList"
+            :key="course.id"
+            :course="course"
+            @select-card="onSelectCard"
+            @click-detail="onClickDetail"
+            @remove-card="onRemoveCard"
+          />
+        </div>
+        <p v-else class="no-result">'{{ searchQuery }}'와(과) 일치하는 골프장이 없습니다.</p>
+
+        <template #footer>
+          <RouterLink class="add-more" to="/courses">
+            <AppIcon name="plus" :size="14" /> 다른 골프장 담기
+          </RouterLink>
+        </template>
+      </BaseDashboardCard>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.evacuate-banner {
-  padding: 12px 14px;
+/* ===== 히어로 : 짙은 덩어리 하나로 시선 고정 ===== */
+.cover {
+  padding: 44px 40px 46px;
   margin-bottom: 16px;
-  border: 1px solid var(--c-danger);
-  border-radius: var(--radius);
-  background: var(--c-danger-bg);
-  color: var(--c-danger);
-  font-size: 13px;
-  font-weight: 700;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(145deg, var(--c-deep) 0%, var(--c-deep-2) 100%);
+  color: #fff;
+  box-shadow: var(--shadow);
 }
+.cover-stamp {
+  margin: 0 0 14px;
+  color: var(--c-accent);
+  letter-spacing: 0.12em;
+}
+.cover-title {
+  margin: 0 0 14px;
+  font-size: 46px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.045em;
+}
+.cover-desc {
+  margin: 0 0 26px;
+  max-width: 560px;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.75;
+  color: rgba(255, 255, 255, 0.66);
+}
+.cover-desc strong {
+  color: #fff;
+  font-weight: 800;
+}
+.cover-cta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 22px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  transition:
+    transform 0.18s var(--ease),
+    background 0.18s var(--ease);
+}
+.cta:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+.cta:active {
+  transform: scale(0.96);
+}
+.cta.primary {
+  background: var(--c-accent);
+  box-shadow: 0 8px 20px -8px var(--c-accent);
+}
+.cta.primary:hover {
+  background: #00b366;
+}
+
+/* ===== 낙뢰 경보 ===== */
+.evacuate-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  border-radius: var(--radius-lg);
+  background: var(--c-danger);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  box-shadow: var(--shadow);
+}
+
+/* ===== 2단 벤토 그리드 ===== */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.side-column {
+  position: sticky;
+  top: 92px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+/* ===== 데이터 출처 바 ===== */
 .source-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 .source-badge {
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
+  padding: 6px 13px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 .source-badge.live {
-  background: var(--c-primary-soft);
-  color: var(--c-primary);
+  background: var(--c-accent-soft);
+  color: var(--c-accent-deep);
 }
 .source-badge.mock {
-  background: var(--c-surface-soft);
-  color: var(--c-text-sub);
+  background: var(--c-paper-alt);
+  color: var(--c-ink-faint);
 }
 .updated {
-  font-size: 11px;
-  color: var(--c-text-sub);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--c-ink-faint);
 }
+
+/* ===== 갱신 버튼 : 눌리는 맛 ===== */
 .btn-row {
   display: flex;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 20px;
+}
+.fetch-btn,
+.refresh-btn {
+  padding: 15px;
+  border: none;
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition:
+    transform 0.18s var(--ease),
+    background 0.18s var(--ease),
+    box-shadow 0.18s var(--ease);
 }
 .fetch-btn {
   flex: 2;
-  padding: 9px;
-  border: none;
-  border-radius: 8px;
-  background: var(--c-primary);
+  background: var(--c-accent);
   color: #fff;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: 0.15s;
+  box-shadow: 0 8px 18px -10px var(--c-accent);
 }
 .fetch-btn:hover:not(:disabled) {
-  background: var(--c-primary-dark);
-}
-.fetch-btn:disabled,
-.refresh-btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-.error-msg {
-  padding: 10px 12px;
-  margin-bottom: 12px;
-  border: 1px solid var(--c-danger);
-  border-radius: 8px;
-  background: var(--c-danger-bg);
-  color: var(--c-danger);
-  font-size: 12px;
+  background: #00b366;
+  box-shadow: 0 12px 24px -10px var(--c-accent);
 }
 .refresh-btn {
   flex: 1;
-  padding: 9px;
-  border: 1px dashed var(--c-border-strong);
-  border-radius: 8px;
-  background: var(--c-surface);
-  color: var(--c-text-sub);
-  font-size: 13px;
-  cursor: pointer;
-  transition: 0.15s;
+  background: var(--c-paper-alt);
+  color: var(--c-ink-soft);
 }
-.refresh-btn:hover {
-  border-color: var(--c-primary);
-  background: var(--c-primary-soft);
-  color: var(--c-primary);
+.refresh-btn:hover:not(:disabled) {
+  background: var(--c-rule);
+  color: var(--c-ink);
+}
+.fetch-btn:active:not(:disabled),
+.refresh-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.fetch-btn:disabled,
+.refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.error-msg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border-radius: var(--radius);
+  background: var(--c-danger-bg);
+  color: var(--c-danger);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* ===== 담기 · 빈 결과 ===== */
+.add-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 16px;
+  border-radius: var(--radius);
+  background: var(--c-paper-alt);
+  color: var(--c-ink-soft);
+  font-size: 14px;
+  font-weight: 700;
+  transition:
+    transform 0.18s var(--ease),
+    background 0.18s var(--ease),
+    color 0.18s var(--ease);
+}
+.add-more:hover {
+  background: var(--c-accent-soft);
+  color: var(--c-accent-deep);
+}
+.add-more:active {
+  transform: scale(0.98);
 }
 .no-result {
-  padding: 28px 20px;
+  padding: 48px 24px;
   border-radius: var(--radius);
-  background: var(--c-surface-soft);
+  background: var(--c-paper-alt);
   text-align: center;
-  font-size: 13px;
-  color: var(--c-text-sub);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-ink-faint);
+}
+
+/* 좁은 화면에서는 1단으로 접는다 */
+@media (max-width: 940px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  .side-column {
+    position: static;
+  }
+  .cover {
+    padding: 30px 22px 32px;
+  }
+  .cover-title {
+    font-size: 32px;
+  }
+  .cover-desc {
+    font-size: 15px;
+  }
 }
 </style>

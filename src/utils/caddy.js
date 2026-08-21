@@ -72,7 +72,6 @@ export const judgePlay = (course, holeDeg, sensitivity) => {
     return {
       ...base,
       level: 'danger',
-      icon: '⛈️',
       label: '플레이 중단',
       className: 'play-danger',
       message: `낙뢰 확률 ${course.lightning}%! 즉시 카트로 대피하세요.`,
@@ -83,7 +82,6 @@ export const judgePlay = (course, holeDeg, sensitivity) => {
     return {
       ...base,
       level: 'danger',
-      icon: '🔴',
       label: '라운딩 위험',
       className: 'play-danger',
       message: '강풍/악천후로 정상적인 샷이 어렵습니다.',
@@ -94,7 +92,6 @@ export const judgePlay = (course, holeDeg, sensitivity) => {
     return {
       ...base,
       level: 'caution',
-      icon: '🟡',
       label: '라운딩 주의',
       className: 'play-caution',
       message: `낙뢰 확률 ${course.lightning}% · 그늘집 근처에서 상황을 지켜보세요.`,
@@ -105,7 +102,6 @@ export const judgePlay = (course, holeDeg, sensitivity) => {
     return {
       ...base,
       level: 'caution',
-      icon: '🟡',
       label: '라운딩 주의',
       className: 'play-caution',
       message: '비로 그립과 라이가 젖습니다. 우천 장비를 챙기세요.',
@@ -116,7 +112,6 @@ export const judgePlay = (course, holeDeg, sensitivity) => {
     return {
       ...base,
       level: 'caution',
-      icon: '🟡',
       label: '라운딩 주의',
       className: 'play-caution',
       message: '시야 확보가 어렵습니다. 앞 팀 위치를 꼭 확인하세요.',
@@ -127,7 +122,6 @@ export const judgePlay = (course, holeDeg, sensitivity) => {
     return {
       ...base,
       level: 'caution',
-      icon: '🟡',
       label: '라운딩 주의',
       className: 'play-caution',
       message: '고온다습, 온열질환 주의! 수분 자주 보충하세요.',
@@ -136,7 +130,6 @@ export const judgePlay = (course, holeDeg, sensitivity) => {
   return {
     ...base,
     level: 'good',
-    icon: '🟢',
     label: '라운딩 최적',
     className: 'play-good',
     message: '컨디션 좋은 날! 자신 있게 치세요.',

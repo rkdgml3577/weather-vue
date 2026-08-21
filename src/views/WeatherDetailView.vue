@@ -1,7 +1,10 @@
 <script setup>
+import AppIcon from '@/components/icons/AppIcon.vue'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseDashboardCard from '@/components/exercise/BaseDashboardCard.vue'
+import ImpactPointGuide from '@/components/exercise/ImpactPointGuide.vue'
+import CaddyControls from '@/components/exercise/CaddyControls.vue'
 import { useWeatherStore } from '@/stores/weatherStore'
 import { useCaddyStore } from '@/stores/caddyStore'
 import { useConfigStore } from '@/stores/configStore'
@@ -9,6 +12,11 @@ import { useDisplayTemp, convertTemp } from '@/composables/useDisplayTemp'
 import { getForecast, getAirPollution } from '@/api/weatherApi'
 import { mapForecast, mapAirPollution } from '@/utils/weatherMapper'
 import { judgePlay, degToText } from '@/utils/caddy'
+import { getImpactGuide } from '@/utils/impact'
+import { getTeeTimeSummary } from '@/utils/teeTime'
+import { findGolfCourse } from '@/data/golfCourses'
+import { createMockForecast, createMockAir } from '@/data/mockCourses'
+import { toast } from '@/composables/useToast'
 
 /* 동적 경로 /weather/:cityId 의 파라미터를 props로 받는다 (router의 props: true) */
 const props = defineProps({
@@ -29,34 +37,86 @@ const error = ref('')
 /* 스토어의 단위 설정에 맞춰 변환된 온도 */
 const { displayTemp, unitSymbol } = useDisplayTemp(() => course.value?.temp)
 
-/* Mount 시점에 cityId로 지역을 선택하고, 그 좌표로 추가 API 2개를 호출 */
-onMounted(async () => {
-  course.value = weatherStore.courseById(props.cityId) ?? null
-  console.log('[onMounted] cityId:', props.cityId, '→', course.value?.name ?? '조회 실패')
-  if (!course.value) return
+/* ===== 모의 데이터 모드 =====
+ * 대시보드가 모의 데이터를 보고 있으면 상세도 통신 없이 모의 값으로 채운다.
+ * (예전에는 상세만 몰래 실시간을 불러와 두 화면의 기준이 어긋났다) */
+const loadMock = () => {
+  error.value = ''
+  /* 아직 한 번도 값이 채워지지 않았다면 이 골프장만 모의 값으로 채운다 */
+  course.value = weatherStore.mockCourseWeather(props.cityId) ?? course.value
+  forecast.value = createMockForecast(course.value, 6)
+  air.value = createMockAir()
+}
 
+/* ===== 실시간 조회 : 현재 날씨 + 예보 + 대기오염 ===== */
+const loadLive = async () => {
   isLoading.value = true
+  error.value = ''
   try {
-    // 현재 날씨 + 예보 + 대기오염을 동시에 요청한다
-    const [, forecastData, airData] = await Promise.all([
+    const [fetched, forecastData, airData] = await Promise.all([
       weatherStore.fetchCourseWeather(props.cityId),
       getForecast(course.value.lat, course.value.lon, 6),
       getAirPollution(course.value.lat, course.value.lon),
     ])
-    course.value = weatherStore.courseById(props.cityId) ?? course.value
+    course.value = fetched ?? course.value
     forecast.value = mapForecast(forecastData, 6)
     air.value = mapAirPollution(airData)
+    return true
   } catch (err) {
     error.value = err.friendlyMessage ?? err.message
     console.error('[WeatherDetailView] 추가 정보 조회 실패:', err)
+    return false
   } finally {
     isLoading.value = false
   }
+}
+
+/* Mount 시점에 cityId로 골프장을 선택하고, 현재 모드에 맞춰 채운다 */
+onMounted(async () => {
+  /* 대시보드에 없는 골프장이면 전체 디렉터리에서 찾는다 */
+  course.value = weatherStore.courseById(props.cityId) ?? findGolfCourse(props.cityId) ?? null
+  console.log('[onMounted] courseId:', props.cityId, '→', course.value?.name ?? '조회 실패')
+  if (!course.value) return
+
+  if (weatherStore.isLive) {
+    await loadLive()
+  } else {
+    loadMock()
+  }
 })
+
+/* 상세 화면에서 바로 모드를 바꿀 수 있다 */
+const switchToLive = async () => {
+  const ok = await loadLive()
+  if (ok) toast.success(`${course.value.name}의 실시간 관측을 불러왔습니다.`)
+  else toast.error(error.value || '실시간 관측을 불러오지 못했습니다.')
+}
+
+const switchToMock = () => {
+  weatherStore.refreshMockWeather()
+  course.value = weatherStore.courseById(props.cityId) ?? course.value
+  loadMock()
+  toast.info('모의 데이터로 전환했습니다. 통신 없이 화면 동작만 확인합니다.')
+}
 
 const play = computed(() =>
   course.value ? judgePlay(course.value, caddyStore.holeDeg, caddyStore.windSensitivity) : null,
 )
+
+/* 실력·홀 방향·바람이 바뀌면 임팩트 지점도 즉시 다시 계산된다 */
+const impactGuide = computed(() =>
+  course.value
+    ? getImpactGuide(
+        course.value,
+        caddyStore.holeDeg,
+        caddyStore.playerLevel,
+        caddyStore.windSensitivity,
+      )
+    : null,
+)
+
+/* 일몰까지 남은 시간으로 소화 가능한 홀 수를 계산 (추가 API 호출 없음) */
+const teeSummary = computed(() => (course.value ? getTeeTimeSummary(course.value) : null))
 
 /* 예보 슬롯도 현재 날씨와 똑같은 기준으로 판정한다 */
 const teeTimes = computed(() =>
@@ -82,11 +142,29 @@ const goHome = () => router.push('/')
 
 <template>
   <div class="detail-view">
-    <BaseDashboardCard v-if="course" icon="📊" title="지역별 상세 기상 관측 정보">
+    <BaseDashboardCard v-if="course" icon="chart" title="골프장 상세 기상 관측 정보">
       <template #meta>{{ course.id }}</template>
 
-      <h3 class="course-name">📍 {{ course.name }} · {{ course.course }}</h3>
-      <p class="region">{{ course.region }} · {{ course.lat }}, {{ course.lon }}</p>
+      <h3 class="course-name"><AppIcon name="pin" :size="16" /> {{ course.name }}</h3>
+      <p class="region">
+        {{ course.region }} {{ course.city }} · {{ course.holes }}홀 · {{ course.type }}
+      </p>
+
+      <!-- 데이터 출처 : 대시보드와 같은 모드를 따른다 -->
+      <div class="source-row">
+        <span class="source-badge" :class="weatherStore.isLive ? 'live' : 'mock'">
+          {{ weatherStore.isLive ? 'LIVE 실시간 관측' : 'MOCK 모의 데이터' }}
+        </span>
+        <button
+          v-if="!weatherStore.isLive"
+          class="source-btn"
+          :disabled="isLoading"
+          @click="switchToLive"
+        >
+          {{ isLoading ? '불러오는 중...' : '실시간으로 보기' }}
+        </button>
+        <button v-else class="source-btn" @click="switchToMock">모의 데이터로 보기</button>
+      </div>
 
       <dl class="observe-list">
         <div class="observe-row">
@@ -122,30 +200,71 @@ const goHome = () => router.push('/')
 
       <div class="advice-box">
         <p class="advice-head">
-          <span class="badge" :class="play.className">{{ play.icon }} {{ play.label }}</span>
+          <span class="badge" :class="play.className">{{ play.label }}</span>
           <span class="condition">
             홀 방향 {{ caddyStore.holeText }}쪽 · {{ caddyStore.levelText }}
           </span>
         </p>
-        <p class="advice">⛳ {{ play.message }}</p>
-        <p class="advice club">🏌️ {{ play.club.text }}</p>
-        <p v-if="play.aim" class="advice">🎯 {{ play.aim }}</p>
-        <p class="advice">💧 {{ play.humidityAdvice }}</p>
+        <p class="advice">{{ play.message }}</p>
+        <p class="advice club"><AppIcon name="club" :size="14" /> {{ play.club.text }}</p>
+        <p v-if="play.aim" class="advice"><AppIcon name="target" :size="14" /> {{ play.aim }}</p>
+        <p class="advice"><AppIcon name="droplet" :size="14" /> {{ play.humidityAdvice }}</p>
       </div>
+
+      <!-- 일몰 기준 잔여 홀 (현재 날씨 응답의 sunset 활용) -->
+      <section v-if="teeSummary" class="sun-section" :class="{ tight: teeSummary.isTight }">
+        <p class="sun-head">
+          <AppIcon name="sunset" :size="15" /> 일몰 {{ teeSummary.sunsetText }} ·
+          <strong>{{ teeSummary.message }}</strong>
+        </p>
+        <p class="sun-sub">
+          18홀 마지막 티오프 {{ teeSummary.lastTeeOff18 }} · 9홀 {{ teeSummary.lastTeeOff9 }}
+          (홀당 15분 기준)
+        </p>
+      </section>
+
+      <!-- 임팩트 포인트 가이드 -->
+      <section class="impact-section">
+        <div class="impact-head">
+          <h4 class="section-title">
+            <AppIcon name="club" :size="14" /> 어디를 쳐야 하나 — 임팩트 포인트
+          </h4>
+          <span class="level-chip">{{ caddyStore.levelText }} 기준</span>
+        </div>
+
+        <!-- 조건을 이 화면에서 바로 바꿔 볼 수 있게 컨트롤을 함께 둔다 -->
+        <CaddyControls
+          :hole-deg="caddyStore.holeDeg"
+          :player-level="caddyStore.playerLevel"
+          @update:hole-deg="caddyStore.setHoleDeg"
+          @update:player-level="caddyStore.setPlayerLevel"
+        />
+
+        <ImpactPointGuide v-if="impactGuide" :guide="impactGuide" />
+      </section>
 
       <!-- 추가 API: 3시간 단위 예보 → 티타임 추천 -->
       <section class="forecast-section">
-        <h4 class="forecast-title">⏰ 티타임 추천 (3시간 단위 예보)</h4>
+        <h4 class="forecast-title">
+          <AppIcon name="clock" :size="14" /> 티타임 추천 (3시간 단위{{
+            weatherStore.isLive ? ' 예보' : ' 모의 예보'
+          }})
+        </h4>
 
-        <p v-if="isLoading" class="hint">⏳ 예보와 대기질 정보를 불러오는 중...</p>
-        <p v-else-if="error" class="error-msg">⚠️ {{ error }}</p>
+        <p v-if="isLoading" class="hint">
+          <AppIcon name="loader" :size="13" /> 예보와 대기질 정보를 불러오는 중...
+        </p>
+        <p v-else-if="error" class="error-msg"><AppIcon name="alert" :size="14" /> {{ error }}</p>
 
         <template v-else-if="teeTimes.length > 0">
           <p v-if="bestTeeTime" class="best-tee">
-            👍 <strong>{{ bestTeeTime.timeText }}</strong> 티오프를 추천합니다 ·
+            <AppIcon name="thumb" :size="14" /> <strong>{{ bestTeeTime.timeText }}</strong> 티오프를
+            추천합니다 ·
             {{ bestTeeTime.play.label }}
           </p>
-          <p v-else class="best-tee warn">😥 향후 18시간 내 추천할 만한 시간대가 없습니다.</p>
+          <p v-else class="best-tee warn">
+            <AppIcon name="frown" :size="14" /> 향후 18시간 내 추천할 만한 시간대가 없습니다.
+          </p>
 
           <ul class="tee-list">
             <li
@@ -156,8 +275,8 @@ const goHome = () => router.push('/')
             >
               <span class="tee-time">{{ slot.timeText }}</span>
               <span class="tee-info">
-                {{ slot.play.icon }} {{ slot.description }} · {{ slotTemp(slot.temp)
-                }}{{ unitSymbol }} · 🌬️{{ slot.windSpeed }}m/s · ☔{{ slot.pop }}%
+                {{ slot.description }} · {{ slotTemp(slot.temp) }}{{ unitSymbol }} · WIND
+                {{ slot.windSpeed }}m/s · RAIN {{ slot.pop }}%
               </span>
             </li>
           </ul>
@@ -170,7 +289,7 @@ const goHome = () => router.push('/')
     </BaseDashboardCard>
 
     <!-- 존재하지 않는 cityId로 접근한 경우 -->
-    <BaseDashboardCard v-else icon="❓" title="조회할 수 없는 지역">
+    <BaseDashboardCard v-else icon="help" title="조회할 수 없는 골프장">
       <p class="empty">'{{ cityId }}' 코드에 해당하는 관측 지역이 없습니다.</p>
       <template #footer>
         <button class="back-btn" @click="goHome">← 메인 대시보드로 돌아가기</button>
@@ -181,171 +300,346 @@ const goHome = () => router.push('/')
 
 <style scoped>
 .course-name {
-  margin: 0 0 2px;
-  font-size: 17px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+.course-name :deep(svg) {
+  color: var(--c-accent);
+  stroke-width: 2.2;
+}
+.source-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.source-badge {
+  padding: 6px 13px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.source-badge.live {
+  background: var(--c-accent-soft);
+  color: var(--c-accent-deep);
+}
+.source-badge.mock {
+  background: var(--c-paper-alt);
+  color: var(--c-ink-faint);
+}
+.source-btn {
+  padding: 6px 13px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--c-deep);
+  color: #fff;
+  font-family: inherit;
+  font-size: 12px;
   font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.18s var(--ease),
+    background 0.18s var(--ease);
+}
+.source-btn:hover:not(:disabled) {
+  background: var(--c-deep-2);
+}
+.source-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.source-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .region {
-  margin: 0 0 14px;
-  font-size: 12px;
-  color: var(--c-text-sub);
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-ink-faint);
 }
+
+/* ===== 관측값 타일 ===== */
 .observe-list {
-  margin: 0 0 14px;
-  padding: 6px 14px;
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius);
-  background: var(--c-surface-soft);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 0 0 16px;
 }
 .observe-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 7px 0;
-  font-size: 13px;
-  border-bottom: 1px solid var(--c-border);
-}
-.observe-row:last-child {
-  border-bottom: none;
+  padding: 16px;
+  border-radius: var(--radius);
+  background: var(--c-paper-alt);
 }
 .observe-row dt {
-  color: var(--c-text-sub);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--c-ink-faint);
 }
 .observe-row dd {
-  margin: 0;
-  font-weight: 700;
+  margin: 4px 0 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
 }
+/* 대기질 타일만 값이 길다 — 2칸을 쓰고 글자를 줄인다 (v-if라 항상 7번째) */
+.observe-row:nth-child(7) {
+  grid-column: span 2;
+}
+.observe-row:nth-child(7) dd {
+  font-size: 17px;
+}
+.observe-row.alert {
+  background: var(--c-danger-bg);
+}
+.observe-row.alert dt,
 .observe-row.alert dd {
   color: var(--c-danger);
 }
+
+/* ===== 캐디 조언 ===== */
 .advice-box {
-  padding: 12px 14px;
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius);
-  background: var(--c-primary-soft);
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  background: var(--c-accent-soft);
 }
 .advice-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin: 0 0 8px;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 12px;
 }
 .condition {
-  font-size: 11px;
-  color: var(--c-text-sub);
-}
-.badge {
-  display: inline-block;
-  padding: 3px 10px;
-  border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
+  color: var(--c-ink-soft);
+}
+.badge {
+  padding: 7px 15px;
+  border-radius: var(--radius-pill);
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
 }
 .play-good {
-  background: var(--c-good-bg);
-  color: var(--c-good);
+  background: var(--c-good);
 }
 .play-caution {
-  background: var(--c-caution-bg);
-  color: var(--c-caution);
+  background: var(--c-caution);
 }
 .play-danger {
-  background: var(--c-danger-bg);
-  color: var(--c-danger);
+  background: var(--c-danger);
 }
 .advice {
-  margin: 0 0 4px;
-  font-size: 13px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--c-ink-soft);
 }
 .advice:last-child {
   margin-bottom: 0;
 }
 .advice.club {
-  font-weight: 700;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--c-accent-deep);
 }
-.empty {
-  padding: 24px;
-  text-align: center;
-  font-size: 13px;
-  color: var(--c-text-sub);
-}
-.back-btn {
-  width: 100%;
-  padding: 10px;
-  border: none;
-  border-radius: 8px;
-  background: var(--c-primary);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: 0.15s;
-}
-.back-btn:hover {
-  background: var(--c-primary-dark);
+.advice :deep(svg) {
+  margin-top: 3px;
+  flex-shrink: 0;
 }
 
-.forecast-section {
+/* ===== 일몰 ===== */
+.sun-section {
   margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--c-border);
+  padding: 18px 20px;
+  border-radius: var(--radius);
+  background: var(--c-paper-alt);
 }
+.sun-section.tight {
+  background: var(--c-caution-bg);
+}
+.sun-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.sun-head strong {
+  font-weight: 800;
+}
+.sun-sub {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-ink-faint);
+}
+
+/* ===== 섹션 공통 ===== */
+.impact-section,
+.forecast-section {
+  margin-top: 28px;
+}
+.impact-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.section-title,
 .forecast-title {
-  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.impact-head .section-title {
+  margin: 0;
+}
+.section-title :deep(svg),
+.forecast-title :deep(svg) {
+  color: var(--c-accent);
+  stroke-width: 2.2;
+}
+.level-chip {
+  padding: 6px 13px;
+  border-radius: var(--radius-pill);
+  background: var(--c-deep);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* ===== 예보 ===== */
+.hint,
+.error-msg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: var(--radius);
   font-size: 13px;
   font-weight: 700;
-  color: var(--c-primary);
 }
 .hint {
-  margin: 0;
-  font-size: 12px;
-  color: var(--c-text-sub);
+  background: var(--c-paper-alt);
+  color: var(--c-ink-soft);
 }
 .error-msg {
-  margin: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--c-danger);
-  border-radius: 8px;
   background: var(--c-danger-bg);
   color: var(--c-danger);
-  font-size: 12px;
 }
 .best-tee {
-  margin: 0 0 10px;
-  padding: 8px 12px;
-  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 16px 18px;
+  border-radius: var(--radius);
   background: var(--c-good-bg);
-  color: var(--c-good);
-  font-size: 13px;
+  color: var(--c-accent-deep);
+  font-size: 15px;
+  font-weight: 700;
+}
+.best-tee strong {
+  font-weight: 800;
 }
 .best-tee.warn {
   background: var(--c-caution-bg);
   color: var(--c-caution);
 }
 .tee-list {
+  display: grid;
+  gap: 6px;
   list-style: none;
   margin: 0;
   padding: 0;
 }
 .tee-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 7px 10px;
-  margin-bottom: 5px;
-  border-radius: 8px;
-  font-size: 12px;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: var(--c-paper-alt);
+  font-size: 13px;
 }
-.tee-row:last-child {
-  margin-bottom: 0;
+.tee-row.play-good {
+  background: var(--c-good-bg);
+}
+.tee-row.play-caution {
+  background: var(--c-caution-bg);
+}
+.tee-row.play-danger {
+  background: var(--c-danger-bg);
 }
 .tee-time {
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   white-space: nowrap;
 }
 .tee-info {
-  color: var(--c-text-sub);
+  font-weight: 600;
+  color: var(--c-ink-soft);
   text-align: right;
+}
+
+/* ===== 기타 ===== */
+.empty {
+  padding: 40px 20px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-ink-faint);
+}
+.back-btn {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--c-deep);
+  color: #fff;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    transform 0.18s var(--ease),
+    background 0.18s var(--ease);
+}
+.back-btn:hover {
+  background: var(--c-deep-2);
+}
+.back-btn:active {
+  transform: scale(0.98);
+}
+
+@media (max-width: 560px) {
+  .course-name {
+    font-size: 26px;
+  }
 }
 </style>
