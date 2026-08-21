@@ -89,8 +89,8 @@ export const judgePlay = (course, holeDeg, sensitivity) => {
       message: '강풍/악천후로 정상적인 샷이 어렵습니다.',
     }
   }
-  // 낙뢰 가능성 · 비 → 주의
-  if (course.lightning >= 20 || course.status === '비') {
+  // 낙뢰 가능성 → 주의
+  if (course.lightning >= 20) {
     return {
       ...base,
       level: 'caution',
@@ -98,6 +98,28 @@ export const judgePlay = (course, holeDeg, sensitivity) => {
       label: '라운딩 주의',
       className: 'play-caution',
       message: `낙뢰 확률 ${course.lightning}% · 그늘집 근처에서 상황을 지켜보세요.`,
+    }
+  }
+  // 우천 → 주의
+  if (course.status === '비' || course.status === '뇌우') {
+    return {
+      ...base,
+      level: 'caution',
+      icon: '🟡',
+      label: '라운딩 주의',
+      className: 'play-caution',
+      message: '비로 그립과 라이가 젖습니다. 우천 장비를 챙기세요.',
+    }
+  }
+  // 안개 → 주의
+  if (course.status === '안개') {
+    return {
+      ...base,
+      level: 'caution',
+      icon: '🟡',
+      label: '라운딩 주의',
+      className: 'play-caution',
+      message: '시야 확보가 어렵습니다. 앞 팀 위치를 꼭 확인하세요.',
     }
   }
   // 고온다습 → 주의

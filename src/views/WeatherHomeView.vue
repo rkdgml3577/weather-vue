@@ -1,19 +1,20 @@
 <script setup>
-import { ref, computed, watch, watchEffect } from 'vue'
+import { ref, computed, watch, watchEffect, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseDashboardCard from '@/components/exercise/BaseDashboardCard.vue'
 import SearchBar from '@/components/exercise/SearchBar.vue'
 import WeatherCard from '@/components/exercise/WeatherCard.vue'
 import CaddyControls from '@/components/exercise/CaddyControls.vue'
 import StatusBar from '@/components/exercise/StatusBar.vue'
-import { courseList, refreshWeather } from '@/data/mockCourses'
+import { useWeatherStore } from '@/stores/weatherStore'
 import { useCaddyStore } from '@/stores/caddyStore'
 import { judgePlay, degToText } from '@/utils/caddy'
 
 /* Programmatic Navigation 용 라우터 인스턴스 */
 const router = useRouter()
 
-/* 페이지를 이동해도 유지되는 라운딩 조건 (Pinia 스토어) */
+/* 날씨 데이터 · 라운딩 조건 스토어 */
+const weatherStore = useWeatherStore()
 const caddyStore = useCaddyStore()
 
 /* 이 화면에서만 쓰는 반응형 상태 */
@@ -26,8 +27,8 @@ const evacuateMsg = ref('')
 const filteredCourseList = computed(() => {
   const base =
     searchQuery.value === ''
-      ? courseList.value
-      : courseList.value.filter((c) => c.name.includes(searchQuery.value))
+      ? weatherStore.courses
+      : weatherStore.courses.filter((c) => c.name.includes(searchQuery.value))
   return base.map((course) => ({
     ...course,
     play: judgePlay(course, caddyStore.holeDeg, caddyStore.windSensitivity),
@@ -35,7 +36,7 @@ const filteredCourseList = computed(() => {
 })
 
 /* ===== 집계 computed ===== */
-const lightningCount = computed(() => courseList.value.filter((c) => c.lightning >= 50).length)
+const lightningCount = computed(() => weatherStore.lightningCount)
 const headwindCount = computed(
   () => filteredCourseList.value.filter((c) => c.play.club.step >= 1).length,
 )
@@ -82,14 +83,29 @@ watchEffect(() => {
   console.log('[watchEffect] 검색어:', searchQuery.value || '(비어있음)')
 })
 
+/* ===== 첫 진입 시 실시간 날씨를 한 번 불러온다 ===== */
+onMounted(() => {
+  if (!weatherStore.isLive) weatherStore.fetchLiveWeather()
+})
+
 /* ===== 자식(SearchBar)이 올려보낸 update-query 처리 ===== */
 const onUpdateQuery = (value) => {
   searchQuery.value = value
 }
 
+/* ===== 실시간 데이터를 받아오면 선택된 카드 정보도 갱신 ===== */
+watch(
+  () => weatherStore.lastUpdated,
+  () => {
+    if (selectedCourseInfo.value) {
+      selectedCourseInfo.value = weatherStore.courseById(selectedCourseInfo.value.id) ?? null
+    }
+  },
+)
+
 /* ===== 자식(WeatherCard)이 올려보낸 select-card 처리 ===== */
 const onSelectCard = (course) => {
-  selectedCourseInfo.value = courseList.value.find((c) => c.id === course.id)
+  selectedCourseInfo.value = weatherStore.courseById(course.id)
   clickCount.value++
 }
 
@@ -127,7 +143,34 @@ const onClickDetail = (course) => {
         🌬️ 맞바람 {{ headwindCount }}곳 · 🔴 위험 {{ dangerCount }}곳 · 클릭 {{ clickCount }}회
       </template>
 
-      <button class="refresh-btn" @click="refreshWeather">🔄 기상 정보 갱신</button>
+      <!-- 데이터 출처 표시 + 갱신 버튼 -->
+      <div class="source-bar">
+        <span class="source-badge" :class="weatherStore.isLive ? 'live' : 'mock'">
+          {{ weatherStore.isLive ? '🌐 실시간 관측' : '🧪 모의 데이터' }}
+        </span>
+        <span v-if="weatherStore.lastUpdatedText" class="updated">
+          {{ weatherStore.lastUpdatedText }} 기준
+        </span>
+      </div>
+
+      <div class="btn-row">
+        <button
+          class="fetch-btn"
+          :disabled="weatherStore.isLoading"
+          @click="weatherStore.fetchLiveWeather()"
+        >
+          {{ weatherStore.isLoading ? '⏳ 불러오는 중...' : '🌐 실시간 날씨 불러오기' }}
+        </button>
+        <button
+          class="refresh-btn"
+          :disabled="weatherStore.isLoading"
+          @click="weatherStore.refreshMockWeather()"
+        >
+          🎲 모의 갱신
+        </button>
+      </div>
+
+      <p v-if="weatherStore.error" class="error-msg">⚠️ {{ weatherStore.error }}</p>
 
       <template v-if="filteredCourseList.length > 0">
         <WeatherCard
@@ -158,10 +201,68 @@ const onClickDetail = (course) => {
   font-size: 13px;
   font-weight: 700;
 }
-.refresh-btn {
-  width: 100%;
-  padding: 9px;
+.source-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.source-badge {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.source-badge.live {
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+}
+.source-badge.mock {
+  background: var(--c-surface-soft);
+  color: var(--c-text-sub);
+}
+.updated {
+  font-size: 11px;
+  color: var(--c-text-sub);
+}
+.btn-row {
+  display: flex;
+  gap: 8px;
   margin-bottom: 12px;
+}
+.fetch-btn {
+  flex: 2;
+  padding: 9px;
+  border: none;
+  border-radius: 8px;
+  background: var(--c-primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.15s;
+}
+.fetch-btn:hover:not(:disabled) {
+  background: var(--c-primary-dark);
+}
+.fetch-btn:disabled,
+.refresh-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.error-msg {
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--c-danger);
+  border-radius: 8px;
+  background: var(--c-danger-bg);
+  color: var(--c-danger);
+  font-size: 12px;
+}
+.refresh-btn {
+  flex: 1;
+  padding: 9px;
   border: 1px dashed var(--c-border-strong);
   border-radius: 8px;
   background: var(--c-surface);

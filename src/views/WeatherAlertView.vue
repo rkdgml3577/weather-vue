@@ -1,16 +1,17 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import BaseDashboardCard from '@/components/exercise/BaseDashboardCard.vue'
-import { courseList, refreshWeather } from '@/data/mockCourses'
+import { useWeatherStore } from '@/stores/weatherStore'
 import { useCaddyStore } from '@/stores/caddyStore'
 import { judgePlay } from '@/utils/caddy'
 
 /* 추가 View: 위험/주의 지역만 모아 보는 경보 현황 페이지 */
+const weatherStore = useWeatherStore()
 const caddyStore = useCaddyStore()
 
 const alertList = computed(() =>
-  courseList.value
+  weatherStore.courses
     .map((course) => ({
       ...course,
       play: judgePlay(course, caddyStore.holeDeg, caddyStore.windSensitivity),
@@ -18,6 +19,11 @@ const alertList = computed(() =>
     .filter((c) => c.play.level !== 'good')
     .sort((a, b) => b.lightning - a.lightning),
 )
+
+/* 이 페이지로 바로 들어와도 실시간 데이터를 한 번 불러온다 */
+onMounted(() => {
+  if (!weatherStore.isLive) weatherStore.fetchLiveWeather()
+})
 
 const dangerCount = computed(() => alertList.value.filter((c) => c.play.level === 'danger').length)
 </script>
@@ -27,7 +33,14 @@ const dangerCount = computed(() => alertList.value.filter((c) => c.play.level ==
     <BaseDashboardCard icon="⛈️" title="낙뢰 · 기상 경보 현황">
       <template #meta>🔴 위험 {{ dangerCount }}곳 / 전체 {{ alertList.length }}곳</template>
 
-      <button class="refresh-btn" @click="refreshWeather">🔄 기상 정보 갱신</button>
+      <button
+        class="refresh-btn"
+        :disabled="weatherStore.isLoading"
+        @click="weatherStore.fetchLiveWeather()"
+      >
+        {{ weatherStore.isLoading ? '⏳ 불러오는 중...' : '🌐 실시간 날씨 다시 불러오기' }}
+      </button>
+      <p v-if="weatherStore.error" class="error-msg">⚠️ {{ weatherStore.error }}</p>
 
       <ul v-if="alertList.length > 0" class="alert-list">
         <li
@@ -67,7 +80,20 @@ const dangerCount = computed(() => alertList.value.filter((c) => c.play.level ==
   cursor: pointer;
   transition: 0.15s;
 }
-.refresh-btn:hover {
+.refresh-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.error-msg {
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--c-danger);
+  border-radius: 8px;
+  background: var(--c-danger-bg);
+  color: var(--c-danger);
+  font-size: 12px;
+}
+.refresh-btn:hover:not(:disabled) {
   border-color: var(--c-primary);
   background: var(--c-primary-soft);
   color: var(--c-primary);

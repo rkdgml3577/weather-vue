@@ -19,6 +19,8 @@ import BaseDashboardCard from '@/components/exercise/BaseDashboardCard.vue'
         <li><code>props / emits</code>로 부모-자식 단방향 데이터 흐름 구성</li>
         <li><code>slot</code>으로 대시보드 박스 디자인을 공통화</li>
         <li>URL 파라미터(<code>/weather/:cityId</code>)로 지역별 상세 페이지 라우팅</li>
+        <li><code>Pinia</code> 스토어로 단위 설정 · 날씨 데이터를 전역 관리</li>
+        <li><code>Axios</code>로 OpenWeatherMap 실시간 관측 · 예보 · 대기질 조회</li>
       </ul>
 
       <template #footer>
